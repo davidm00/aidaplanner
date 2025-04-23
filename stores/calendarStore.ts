@@ -1,21 +1,7 @@
 import { create } from 'zustand';
 
-import { CalendarEvent } from './models';
+import { CalendarEvent, CalendarState, CalendarActions } from './models';
 import { getLocalDateString } from '@/utils/calendar';
-
-type CalendarState = {
-  selectedDate: string | null;
-  eventsByDate: Record<string, CalendarEvent[]>;
-};
-
-type CalendarActions = {
-  setSelectedDate: (date: string | null) => void;
-  addEvent: (event: CalendarEvent) => void;
-  getEventsForDate: (date: string) => CalendarEvent[];
-  setEventsByDate: (events: Record<string, CalendarEvent[]>) => void;
-  updateEvent: (date: string, index: number, updated: Partial<CalendarEvent>) => void;
-  deleteEvent: (date: string, index: number) => void;
-};
 
 export const useCalendarStore = create<CalendarState & CalendarActions>((set, get) => ({
   // Default to today
@@ -27,25 +13,42 @@ export const useCalendarStore = create<CalendarState & CalendarActions>((set, ge
     set({ selectedDate: date });
   },
 
-  addEvent: (event) =>
-    set((state) => {
-      const updatedEventsByDate = {
-        ...state.eventsByDate,
-        [event.date]: [
-          ...(state.eventsByDate[event.date] || []),
-          event,
-        ],
-      };
-      // console.log('Updated eventsByDate:', updatedEventsByDate);
-      return { eventsByDate: updatedEventsByDate };
-    }),
+  addEvent: (dateOrEvent: string | CalendarEvent, event?: CalendarEvent) => {
+    if (typeof dateOrEvent === 'string' && event) {
+      // Called with (date, event)
+      set((state) => ({
+        eventsByDate: {
+          ...state.eventsByDate,
+          [dateOrEvent]: [
+            ...(state.eventsByDate[dateOrEvent] || []),
+            { ...event, completed: false }
+          ],
+        }
+      }));
+    } else if (typeof dateOrEvent === 'object') {
+      // Called with just (event)
+      const event = dateOrEvent;
+      set((state) => ({
+        eventsByDate: {
+          ...state.eventsByDate,
+          [event.date]: [
+            ...(state.eventsByDate[event.date] || []),
+            { ...event, completed: false }
+          ],
+        }
+      }));
+    }
+  },
+
   getEventsForDate: (date) => {
     const { eventsByDate } = get();
     const events = eventsByDate[date] || [];
     // console.log(`Events for date ${date}:`, events);
     return events;
   },
+
   setEventsByDate: (newEvents) => set({ eventsByDate: newEvents }),
+
   updateEvent: (date: string, index: number, updated: Partial<CalendarEvent>) =>
     set((state) => {
       const events = state.eventsByDate[date] || [];
@@ -58,6 +61,7 @@ export const useCalendarStore = create<CalendarState & CalendarActions>((set, ge
         },
       };
     }),
+
   deleteEvent: (date: string, index: number) =>
     set((state) => {
       const events = state.eventsByDate[date] || [];
@@ -69,5 +73,6 @@ export const useCalendarStore = create<CalendarState & CalendarActions>((set, ge
         },
       };
     }),
-  
+
+  deleteAllEvents: () => set({ eventsByDate: {} }),
 }));
